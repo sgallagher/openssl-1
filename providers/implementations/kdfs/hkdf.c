@@ -340,6 +340,56 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
             return 0;
         return OSSL_PARAM_set_size_t(p, sz);
     }
+
+#ifdef FIPS_MODULE
+    if ((p = OSSL_PARAM_locate(params,
+                OSSL_KDF_PARAM_HKDF_REDHAT_FIPS_INDICATOR)) != NULL) {
+        int fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_UNDETERMINED;
+        switch (ctx->mode) {
+        case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
+            /* TLS 1.3 never uses extract-and-expand */
+            fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
+            break;
+        case EVP_KDF_HKDF_MODE_EXTRACT_ONLY:
+            {
+                /* When TLS 1.3 uses extract, the following holds:
+                 * 1. The salt length matches the hash length, and either
+                 * 2.1. the key is all zeroes and matches the hash length, or
+                 * 2.2. the key originates from a PSK (resumption_master_secret
+                 *   or some externally esablished key), or an ECDH or DH key
+                 *   derivation. See
+                 *   https://www.rfc-editor.org/rfc/rfc8446#section-7.1.
+                 * Unfortunately at this point, we cannot verify where the key
+                 * comes from, so all we can do is check the salt length.
+                 */
+                const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
+                if (md != NULL && ctx->salt_len == EVP_MD_get_size(md))
+                    fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_APPROVED;
+                else
+                    fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
+            }
+            break;
+        case EVP_KDF_HKDF_MODE_EXPAND_ONLY:
+            /* When TLS 1.3 uses expand, it always provides a label that
+             * contains an uint16 for the length, followed by between 7 and 255
+             * bytes for a label string that starts with "tls13 " or "dtls13".
+             * For compatibility with future versions, we only check for "tls"
+             * or "dtls". See
+             * https://www.rfc-editor.org/rfc/rfc8446#section-7.1 and
+             * https://www.rfc-editor.org/rfc/rfc9147#section-5.9. */
+            if (ctx->label != NULL
+                    && ctx->label_len >= 2 /* length */ + 4 /* "dtls" */
+                    && (strncmp("tls", (const char *)ctx->label + 2, 3) == 0 ||
+                        strncmp("dtls", (const char *)ctx->label + 2, 4) == 0))
+                fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_APPROVED;
+            else
+                fips_indicator = EVP_KDF_HKDF_FIPS_INDICATOR_NOT_APPROVED;
+            break;
+        }
+        return OSSL_PARAM_set_int(p, fips_indicator);
+    }
+#endif /* defined(FIPS_MODULE) */
+
     return -2;
 }
 
@@ -348,6 +398,9 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_HKDF_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;
