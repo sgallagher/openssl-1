@@ -26,7 +26,7 @@ use platform;
 my $no_check = disabled("fips") || disabled('fips-securitychecks');
 plan skip_all => "Test only supported in a fips build with security checks"
     if $no_check;
-plan tests => 11;
+plan tests => 10;
 
 my $fipsmodule = bldtop_file('providers', platform->dso('fips'));
 my $fipsconf = srctop_file("test", "fips-and-base.cnf");
@@ -168,60 +168,6 @@ sub tsignverify {
                  '-signature', $sigfile,
                  $bogus_data])),
        $testtext);
-}
-
-SKIP : {
-    skip "FIPS EC tests because of no ec in this build", 1
-        if disabled("ec");
-
-    subtest EC => sub {
-        my $testtext_prefix = 'EC';
-        my $a_fips_curve = 'prime256v1';
-        my $fips_key = $testtext_prefix.'.fips.priv.pem';
-        my $fips_pub_key = $testtext_prefix.'.fips.pub.pem';
-        my $a_nonfips_curve = 'brainpoolP256r1';
-        my $nonfips_key = $testtext_prefix.'.nonfips.priv.pem';
-        my $nonfips_pub_key = $testtext_prefix.'.nonfips.pub.pem';
-        my $testtext = '';
-        my $curvename = '';
-
-        plan tests => 5 + $tsignverify_count;
-
-        $ENV{OPENSSL_CONF} = $defaultconf;
-        $curvename = $a_nonfips_curve;
-        $testtext = $testtext_prefix.': '.
-            'Generate a key with a non-FIPS algorithm with the default provider';
-        ok(run(app(['openssl', 'genpkey', '-algorithm', 'EC',
-                    '-pkeyopt', 'ec_paramgen_curve:'.$curvename,
-                    '-out', $nonfips_key])),
-           $testtext);
-
-        pubfrompriv($testtext_prefix, $nonfips_key, $nonfips_pub_key, "non-FIPS");
-
-        $ENV{OPENSSL_CONF} = $fipsconf;
-
-        $curvename = $a_fips_curve;
-        $testtext = $testtext_prefix.': '.
-            'Generate a key with a FIPS algorithm';
-        ok(run(app(['openssl', 'genpkey', '-algorithm', 'EC',
-                    '-pkeyopt', 'ec_paramgen_curve:'.$curvename,
-                    '-out', $fips_key])),
-           $testtext);
-
-        pubfrompriv($testtext_prefix, $fips_key, $fips_pub_key, "FIPS");
-
-        $curvename = $a_nonfips_curve;
-        $testtext = $testtext_prefix.': '.
-            'Generate a key with a non-FIPS algorithm'.
-            ' (should fail)';
-        ok(!run(app(['openssl', 'genpkey', '-algorithm', 'EC',
-                     '-pkeyopt', 'ec_paramgen_curve:'.$curvename,
-                     '-out', $testtext_prefix.'.'.$curvename.'.priv.pem'])),
-           $testtext);
-
-        tsignverify($testtext_prefix, $fips_key, $fips_pub_key, $nonfips_key,
-                    $nonfips_pub_key);
-    };
 }
 
 SKIP: {

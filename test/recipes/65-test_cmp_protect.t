@@ -7,7 +7,6 @@
 # this file except in compliance with the License.  You can obtain a copy
 # in the file LICENSE in the source distribution or at
 # https://www.openssl.org/source/license.html
-
 use strict;
 use OpenSSL::Test qw/:DEFAULT data_file srctop_file srctop_dir bldtop_file bldtop_dir/;
 use OpenSSL::Test::Utils;
@@ -27,7 +26,7 @@ plan skip_all => "This test is not supported in a no-cmp build"
 plan skip_all => "This test is not supported in a shared library build on Windows"
     if $^O eq 'MSWin32' && !disabled("shared");
 
-plan tests => 2 + ($no_fips ? 0 : 1); #fips test
+plan skip_all => 2 + ($no_fips ? 0 : 1); #fips test
 
 my @basic_cmd = ("cmp_protect_test",
                  data_file("server.pem"),

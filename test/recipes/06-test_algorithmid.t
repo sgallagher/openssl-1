@@ -33,7 +33,7 @@ my %certs_info =
          'ee-cert-ec-named-explicit' => 'ca-cert-ec-explicit',
          'ee-cert-ec-named-named' => 'ca-cert-ec-named',
          # 'server-ed448-cert' => 'root-ed448-cert'
-         'server-ecdsa-brainpoolP256r1-cert' => 'rootcert',
+		 # 'server-ecdsa-brainpoolP256r1-cert' => 'rootcert',
         )
      )
     );

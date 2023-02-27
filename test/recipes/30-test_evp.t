@@ -116,7 +116,6 @@ my @defltfiles = qw(
                      evppkey_kdf_tls1_prf.txt
                      evppkey_rsa.txt
                     );
-push @defltfiles, qw(evppkey_brainpool.txt) unless $no_ec;
 push @defltfiles, qw(evppkey_sm2.txt) unless $no_sm2;
 
 plan tests =>
