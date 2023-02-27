@@ -575,6 +575,9 @@ int ossl_prov_drbg_reseed(PROV_DRBG *drbg, int prediction_resistance,
 #endif
     }
 
+#ifdef FIPS_MODULE
+    prediction_resistance = 1;
+#endif
     /* Reseed using our sources in addition */
     entropylen = get_entropy(drbg, &entropy, drbg->strength,
                              drbg->min_entropylen, drbg->max_entropylen,
