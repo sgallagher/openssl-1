@@ -79,6 +79,9 @@ static int list_builtin_curves(BIO *out)
         const char *comment = curves[n].comment;
         const char *sname = OBJ_nid2sn(curves[n].nid);
 
+        if ((curves[n].nid == NID_secp256k1) && EVP_default_properties_is_fips_enabled(NULL))
+            continue;
+
         if (comment == NULL)
             comment = "CURVE DESCRIPTION NOT AVAILABLE";
         if (sname == NULL)
