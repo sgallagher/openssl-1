@@ -333,6 +333,11 @@ static int ec_generate_key(EC_KEY *eckey, int pairwise_test)
 
         OSSL_SELF_TEST_get_callback(eckey->libctx, &cb, &cbarg);
         ok = ecdsa_keygen_pairwise_test(eckey, cb, cbarg);
+
+#ifdef FIPS_MODULE
+        ok &= ossl_ec_key_public_check(eckey, ctx);
+        ok &= ossl_ec_key_pairwise_check(eckey, ctx);
+#endif /* FIPS_MODULE */
     }
 err:
     /* Step (9): If there is an error return an invalid keypair. */

@@ -23,6 +23,7 @@
 #include <time.h>
 #include "internal/cryptlib.h"
 #include <openssl/bn.h>
+#include <openssl/obj_mac.h>
 #include <openssl/self_test.h>
 #include "prov/providercommon.h"
 #include "rsa_local.h"
@@ -478,52 +479,43 @@ static int rsa_keygen(OSSL_LIB_CTX *libctx, RSA *rsa, int bits, int primes,
 static int rsa_keygen_pairwise_test(RSA *rsa, OSSL_CALLBACK *cb, void *cbarg)
 {
     int ret = 0;
-    unsigned int ciphertxt_len;
-    unsigned char *ciphertxt = NULL;
-    const unsigned char plaintxt[16] = {0};
-    unsigned char *decoded = NULL;
-    unsigned int decoded_len;
-    unsigned int plaintxt_len = (unsigned int)sizeof(plaintxt_len);
-    int padding = RSA_PKCS1_PADDING;
+    unsigned int signature_len;
+    unsigned char *signature = NULL;
     OSSL_SELF_TEST *st = NULL;
+    static const unsigned char dgst[] = {
+        0x7f, 0x83, 0xb1, 0x65, 0x7f, 0xf1, 0xfc, 0x53, 0xb9, 0x2d, 0xc1, 0x81,
+        0x48, 0xa1, 0xd6, 0x5d, 0xfc, 0x2d, 0x4b, 0x1f, 0xa3, 0xd6, 0x77, 0x28,
+        0x4a, 0xdd, 0xd2, 0x00, 0x12, 0x6d, 0x90, 0x69
+    };
 
     st = OSSL_SELF_TEST_new(cb, cbarg);
     if (st == NULL)
         goto err;
     OSSL_SELF_TEST_onbegin(st, OSSL_SELF_TEST_TYPE_PCT,
+                           /* No special name for RSA signature PCT*/
                            OSSL_SELF_TEST_DESC_PCT_RSA_PKCS1);
 
-    ciphertxt_len = RSA_size(rsa);
-    /*
-     * RSA_private_encrypt() and RSA_private_decrypt() requires the 'to'
-     * parameter to be a maximum of RSA_size() - allocate space for both.
-     */
-    ciphertxt = OPENSSL_zalloc(ciphertxt_len * 2);
-    if (ciphertxt == NULL)
-        goto err;
-    decoded = ciphertxt + ciphertxt_len;
-
-    ciphertxt_len = RSA_public_encrypt(plaintxt_len, plaintxt, ciphertxt, rsa,
-                                       padding);
-    if (ciphertxt_len <= 0)
-        goto err;
-    if (ciphertxt_len == plaintxt_len
-        && memcmp(ciphertxt, plaintxt, plaintxt_len) == 0)
+    signature_len = RSA_size(rsa);
+    signature = OPENSSL_zalloc(signature_len);
+    if (signature == NULL)
         goto err;
 
-    OSSL_SELF_TEST_oncorrupt_byte(st, ciphertxt);
+    if (RSA_sign(NID_sha256, dgst, sizeof(dgst), signature, &signature_len, rsa) <= 0)
+        goto err;
 
-    decoded_len = RSA_private_decrypt(ciphertxt_len, ciphertxt, decoded, rsa,
-                                      padding);
-    if (decoded_len != plaintxt_len
-        || memcmp(decoded, plaintxt,  decoded_len) != 0)
+    if (signature_len <= 0)
+        goto err;
+
+    OSSL_SELF_TEST_oncorrupt_byte(st, signature);
+
+    if (RSA_verify(NID_sha256, dgst, sizeof(dgst), signature, signature_len, rsa) <= 0)
         goto err;
 
     ret = 1;
 err:
     OSSL_SELF_TEST_onend(st, ret);
     OSSL_SELF_TEST_free(st);
-    OPENSSL_free(ciphertxt);
+    OPENSSL_free(signature);
 
     return ret;
 }
